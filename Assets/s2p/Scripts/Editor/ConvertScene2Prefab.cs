@@ -72,7 +72,8 @@ public class ConvertScene2Prefab : EditorWindow
             else
             {
                 EditorUtility.DisplayDialog("Hint",
-                    string.Format("Create success!\nOutput Path: {0}", _savePath + "/" +  _defaultOutputName + ".prefab"),
+                    string.Format("Create success!\nOutput Path: {0}",
+                        _savePath + "/" + _defaultOutputName + ".prefab"),
                     "Ok");
             }
         }
@@ -114,20 +115,64 @@ public class ConvertScene2Prefab : EditorWindow
             Debug.Log("Load scene " + scene.name + " success!");
 
         var root = new GameObject(_defaultOutputName);
+
+        var i = 0;
         foreach (var gameObject in scene.GetRootGameObjects())
         {
-            if (gameObject.name == root.name)
-                continue;
-            
-            var obj = Object.Instantiate(gameObject, root.transform);
-            obj.name = obj.name.Replace("(Clone)", "");
+            if (EditorUtility.DisplayCancelableProgressBar("Processing root elements", gameObject.name,
+                (i + 1) / (float) scene.rootCount))
+            {
+                _errorMsg = "User cancel";
+                if (string.IsNullOrEmpty(currentActiveScenePath))
+                    EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+                else
+                    EditorSceneManager.OpenScene(currentActiveScenePath);
+                return false;
+            }
+
+            gameObject.transform.SetParent(root.transform);
+
+            i++;
+        }
+
+        if (EditorUtility.DisplayCancelableProgressBar("Copying prefab", root.name, 1))
+        {
+            _errorMsg = "User cancel";
+            if (string.IsNullOrEmpty(currentActiveScenePath))
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+            else
+                EditorSceneManager.OpenScene(currentActiveScenePath);
+            return false;
+        }
+
+        root = Object.Instantiate(root, null);
+
+        if (EditorUtility.DisplayCancelableProgressBar("Saving prefab", root.name, 1))
+        {
+            _errorMsg = "User cancel";
+            if (string.IsNullOrEmpty(currentActiveScenePath))
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+            else
+                EditorSceneManager.OpenScene(currentActiveScenePath);
+            return false;
         }
 
         if (!SavePrefab(GetResRelativePath(_savePath), root))
+        {
+            EditorUtility.ClearProgressBar();
+            if (string.IsNullOrEmpty(currentActiveScenePath))
+                EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+            else
+                EditorSceneManager.OpenScene(currentActiveScenePath);
             return false;
+        }
 
-        EditorSceneManager.OpenScene(currentActiveScenePath);
+        EditorUtility.ClearProgressBar();
 
+        if (string.IsNullOrEmpty(currentActiveScenePath))
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+        else
+            EditorSceneManager.OpenScene(currentActiveScenePath);
         return true;
     }
 
